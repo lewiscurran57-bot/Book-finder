@@ -234,31 +234,49 @@ function starString(rating) {
 }
 
 function renderBooks(books) {
+  window.currentBooks = books;
   if (!books.length) {
-    results.innerHTML = '<p class="status">No results. Try a different search or loosen your filters.</p>';
+    results.innerHTML = '<p class="status">No results. Try a shorter or simpler search, or loosen your filters.</p>';
     return;
   }
-  results.innerHTML = books.map(b => `
+  results.innerHTML = books.map((b, i) => `
     <div class="book-row">
       ${b.cover
         ? `<img class="book-cover" src="${b.cover}" alt="Cover of ${escapeHtml(b.title)}">`
         : `<div class="book-cover placeholder">${escapeHtml(b.title.slice(0,28))}</div>`}
       <div class="book-info">
-        <p class="book-title">${escapeHtml(b.title)}</p>
+        <p class="book-title">${escapeHtml(b.title)}${b.subtitle ? ': ' + escapeHtml(b.subtitle) : ''}</p>
         <p class="book-author">${escapeHtml(b.authors || 'Unknown author')}</p>
         <div class="book-meta">
-          ${b.rating ? `<span class="rating">${starString(b.rating)}</span> <span>(${b.ratingsCount || 0} ratings)</span>` : '<span>No rating yet</span>'}
+          ${b.rating ? `<span class="rating">${starString(b.rating)}</span> <span>(${b.ratingsCount || 0} ratings)</span>` : '<span>No community rating yet</span>'}
           ${b.year ? `<span class="tag">${b.year}</span>` : ''}
-          ${b.categories ? `<span class="tag">${escapeHtml(b.categories)}</span>` : ''}
+          ${(b.categories || []).slice(0, 3).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('')}
         </div>
-        ${b.description ? `<p class="book-desc">${escapeHtml(b.description.slice(0, 220))}${b.description.length > 220 ? '…' : ''}</p>` : ''}
+        ${b.description ? `<p class="book-desc">${escapeHtml(b.description.slice(0, 200))}${b.description.length > 200 ? '…' : ''}</p>` : ''}
         <div class="book-actions">
+          <button class="ghost" onclick="toggleDetails(${i})">Details</button>
           ${b.previewLink ? `<button class="ghost" onclick="window.open('${b.previewLink}','_blank')">View</button>` : ''}
-          <button class="ghost" onclick="findSimilarTo('${escapeHtml(b.title).replace(/'/g, "\\'")}', '${escapeHtml(b.authors || '').replace(/'/g, "\\'")}')">Find similar</button>
+          <button class="ghost" onclick="findSimilarTo(${i})">Find similar</button>
         </div>
+        <div class="book-details" id="details-${i}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--rule);"></div>
       </div>
     </div>
   `).join('');
+}
+
+function toggleDetails(i) {
+  const b = window.currentBooks[i];
+  const el = document.getElementById('details-' + i);
+  if (el.style.display === 'block') { el.style.display = 'none'; return; }
+  el.innerHTML = `
+    ${b.description ? `<p class="book-desc" style="max-width:70ch;">${escapeHtml(b.description)}</p>` : '<p class="book-desc">No description available for this title.</p>'}
+    <div class="book-meta">
+      ${(b.categories || []).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('')}
+      ${b.publisher ? `<span class="tag">${escapeHtml(b.publisher)}</span>` : ''}
+      ${b.pageCount ? `<span class="tag">${b.pageCount} pages</span>` : ''}
+    </div>
+  `;
+  el.style.display = 'block';
 }
 
 function escapeHtml(str) {
@@ -270,12 +288,15 @@ function parseGoogleBooks(items) {
     const v = item.volumeInfo || {};
     return {
       title: v.title || 'Untitled',
+      subtitle: v.subtitle || '',
       authors: (v.authors || []).join(', '),
       rating: v.averageRating || null,
       ratingsCount: v.ratingsCount || 0,
       year: v.publishedDate ? v.publishedDate.slice(0,4) : null,
-      categories: (v.categories || [])[0] || null,
+      categories: v.categories || [],
       description: v.description || '',
+      publisher: v.publisher || '',
+      pageCount: v.pageCount || null,
       cover: v.imageLinks ? (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail) : null,
       previewLink: v.previewLink || null
     };
@@ -291,6 +312,36 @@ function applyFiltersAndSort(books) {
   return filtered;
 }
 
+function keyParamFor() {
+  return GOOGLE_BOOKS_KEY && GOOGLE_BOOKS_KEY !== 'PASTE_YOUR_KEY_HERE' ? '&key=' + GOOGLE_BOOKS_KEY : '';
+}
+
+async function googleBooksSearch(query, maxResults) {
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}${keyParamFor()}&maxResults=${maxResults}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || 'Google Books request failed');
+  return parseGoogleBooks(data.items);
+}
+
+async function openLibrarySearch(q) {
+  const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&fields=title,author_name,first_publish_year,subject,cover_i,key&limit=20`);
+  const data = await res.json();
+  return (data.docs || []).map(w => ({
+    title: w.title || 'Untitled',
+    subtitle: '',
+    authors: (w.author_name || []).join(', '),
+    rating: null,
+    ratingsCount: 0,
+    year: w.first_publish_year || null,
+    categories: (w.subject || []).slice(0, 5),
+    description: '',
+    publisher: '',
+    pageCount: null,
+    cover: w.cover_i ? `https://covers.openlibrary.org/b/id/${w.cover_i}-M.jpg` : null,
+    previewLink: w.key ? `https://openlibrary.org${w.key}` : null
+  }));
+}
+
 async function doSearch() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return;
@@ -300,24 +351,19 @@ async function doSearch() {
   document.getElementById('similarIntro').style.display = 'none';
   results.innerHTML = '<p class="status">Searching the shelves…</p>';
 
-  let query = q;
-  if (genreFilter.value) query += ` subject:${genreFilter.value}`;
+  const genreQuery = genreFilter.value ? ` subject:"${genreFilter.value}"` : '';
 
   try {
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}${GOOGLE_BOOKS_KEY && GOOGLE_BOOKS_KEY !== 'PASTE_YOUR_KEY_HERE' ? '&key=' + GOOGLE_BOOKS_KEY : ''}&maxResults=20`);
-    const data = await res.json();
-    if (data.error) {
-      results.innerHTML = '<p class="status">Google Books said: ' + escapeHtml(data.error.message || 'request failed') + '. This usually means the free quota was hit — adding an API key near the top of the script fixes it.</p>';
-      return;
+    let books = await googleBooksSearch(q + genreQuery, 20);
+    if (!books.length && genreQuery) {
+      books = await googleBooksSearch(q, 20); // genre filter zeroed it out — retry without it
     }
-    if (!data.items) {
-      results.innerHTML = '<p class="status">No results. Try a different search or loosen your filters.</p>';
-      return;
+    if (!books.length) {
+      books = await openLibrarySearch(q); // more forgiving with loose/partial titles
     }
-    const books = applyFiltersAndSort(parseGoogleBooks(data.items));
-    renderBooks(books);
+    renderBooks(applyFiltersAndSort(books));
   } catch (e) {
-    results.innerHTML = '<p class="status">Network error reaching Google Books: ' + escapeHtml(e.message) + '</p>';
+    results.innerHTML = '<p class="status">' + escapeHtml(e.message) + '</p>';
   }
 }
 
@@ -329,12 +375,15 @@ async function loadTrending() {
     const works = (data.works || []).slice(0, 20);
     const books = works.map(w => ({
       title: w.title || 'Untitled',
+      subtitle: '',
       authors: (w.author_name || []).join(', '),
       rating: null,
       ratingsCount: 0,
       year: w.first_publish_year || null,
-      categories: (w.subject && w.subject[0]) || null,
+      categories: (w.subject || []).slice(0, 5),
       description: '',
+      publisher: '',
+      pageCount: null,
       cover: w.cover_i ? `https://covers.openlibrary.org/b/id/${w.cover_i}-M.jpg` : null,
       previewLink: w.key ? `https://openlibrary.org${w.key}` : null
     }));
@@ -344,50 +393,94 @@ async function loadTrending() {
   }
 }
 
-async function runSimilarSearch(title, author) {
+const GENERIC_SUBJECTS = new Set(['fiction','nonfiction','general','literature','juvenile fiction',
+  'large type books','protected daisy','accessible book','overdrive','reading level-grade']);
+
+async function runSimilarSearch(title, author, seedCategories) {
   results.innerHTML = '<p class="status">Finding books near "' + escapeHtml(title) + '"…</p>';
   try {
-    // First, look up the seed book to get its category
-    const keyParam = GOOGLE_BOOKS_KEY && GOOGLE_BOOKS_KEY !== 'PASTE_YOUR_KEY_HERE' ? '&key=' + GOOGLE_BOOKS_KEY : '';
-    const seedRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title + (author ? ' ' + author : ''))}${keyParam}&maxResults=1`);
-    const seedData = await seedRes.json();
-    if (seedData.error) {
-      results.innerHTML = '<p class="status">Google Books said: ' + escapeHtml(seedData.error.message || 'request failed') + '. This usually means the free quota was hit — adding an API key near the top of the script fixes it.</p>';
-      return;
-    }
-    const seed = (seedData.items && seedData.items[0] && seedData.items[0].volumeInfo) || {};
-    const category = (seed.categories || [])[0];
-    const seedAuthor = author || (seed.authors || [])[0] || '';
+    // Pull specific themes from Open Library — richer than Google's broad "Fiction"-level categories
+    const olRes = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(title + (author ? ' ' + author : ''))}&fields=subject&limit=1`);
+    const olData = await olRes.json();
+    const olSubjects = (olData.docs && olData.docs[0] && olData.docs[0].subject) || [];
+    const specificSubjects = olSubjects
+      .filter(s => !GENERIC_SUBJECTS.has(s.toLowerCase()) && s.length < 40)
+      .slice(0, 3);
 
-    const queries = [];
-    if (seedAuthor) queries.push(`inauthor:"${seedAuthor}"`);
-    if (category) queries.push(`subject:"${category}"`);
-    if (!queries.length) queries.push(title);
+    let candidates = [];
+    if (specificSubjects.length) {
+      const subjectResults = await Promise.all(specificSubjects.map(async s => {
+        const slug = s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        try {
+          const r = await fetch(`https://openlibrary.org/subjects/${slug}.json?limit=8`);
+          const d = await r.json();
+          return (d.works || []).map(w => ({
+            title: w.title,
+            subtitle: '',
+            authors: (w.authors || []).map(a => a.name).join(', '),
+            year: w.first_publish_year || null,
+            cover: w.cover_id ? `https://covers.openlibrary.org/b/id/${w.cover_id}-M.jpg` : null,
+            previewLink: w.key ? `https://openlibrary.org${w.key}` : null,
+            categories: [s], rating: null, ratingsCount: 0, description: '', publisher: '', pageCount: null
+          }));
+        } catch { return []; }
+      }));
+      candidates = subjectResults.flat();
+    }
 
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(queries.join(' OR '))}${keyParam}&maxResults=20`);
-    const data = await res.json();
-    if (data.error) {
-      results.innerHTML = '<p class="status">Google Books said: ' + escapeHtml(data.error.message || 'request failed') + '.</p>';
-      return;
+    const seen = new Set();
+    candidates = candidates.filter(b => {
+      const key = b.title.toLowerCase();
+      if (key === title.toLowerCase() || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Enrich the top matches with Google Books data so ratings/descriptions show up
+    const enriched = await Promise.all(candidates.slice(0, 10).map(async c => {
+      try {
+        const author0 = c.authors ? c.authors.split(',')[0] : '';
+        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:"' + c.title + '"' + (author0 ? ' inauthor:"' + author0 + '"' : ''))}${keyParamFor()}&maxResults=1`);
+        const d = await r.json();
+        const v = d.items && d.items[0] && d.items[0].volumeInfo;
+        if (v) {
+          return { ...c,
+            rating: v.averageRating || null, ratingsCount: v.ratingsCount || 0,
+            description: v.description || '',
+            categories: (v.categories && v.categories.length) ? v.categories : c.categories,
+            cover: v.imageLinks ? (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail) : c.cover,
+            previewLink: v.previewLink || c.previewLink,
+            publisher: v.publisher || '', pageCount: v.pageCount || null };
+        }
+      } catch {}
+      return c;
+    }));
+
+    let books = enriched.length ? enriched : candidates;
+
+    // Fallback: author + broad category, if subject-based matching found nothing
+    if (!books.length) {
+      const cat = (seedCategories && seedCategories[0]) || '';
+      const queries = [];
+      if (author) queries.push(`inauthor:"${author.split(',')[0]}"`);
+      if (cat) queries.push(`subject:"${cat}"`);
+      if (!queries.length) queries.push(title);
+      books = (await googleBooksSearch(queries.join(' OR '), 20)).filter(b => b.title.toLowerCase() !== title.toLowerCase());
     }
-    if (!data.items) {
-      results.innerHTML = '<p class="status">No results. Try a different search or loosen your filters.</p>';
-      return;
-    }
-    let books = parseGoogleBooks(data.items).filter(b => b.title.toLowerCase() !== title.toLowerCase());
-    books = applyFiltersAndSort(books);
-    renderBooks(books);
+
+    renderBooks(applyFiltersAndSort(books));
   } catch (e) {
-    results.innerHTML = '<p class="status">Network error finding similar books: ' + escapeHtml(e.message) + '</p>';
+    results.innerHTML = '<p class="status">' + escapeHtml(e.message) + '</p>';
   }
 }
 
-function findSimilarTo(title, author) {
-  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'similar'));
+function findSimilarTo(i) {
+  const b = window.currentBooks[i];
+  document.querySelectorAll('nav.tabs button').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === 'similar'));
   document.getElementById('trendingIntro').style.display = 'none';
   document.getElementById('similarIntro').style.display = 'block';
-  document.getElementById('similarInput').value = title;
-  runSimilarSearch(title, author);
+  document.getElementById('similarInput').value = b.title;
+  runSimilarSearch(b.title, b.authors, b.categories);
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
