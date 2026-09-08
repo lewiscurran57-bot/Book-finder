@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Stacks — Book Finder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,9 +18,10 @@
     --brass-soft: #a9862a;
     --dusty-blue: #8fb3bc;
     --rule: rgba(242,236,217,0.14);
-    --radius: 8px;
+    --radius: 10px;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
     margin: 0;
     background: var(--ink);
@@ -28,168 +29,248 @@
     font-family: 'Inter', sans-serif;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
   }
   h1, h2, h3, .serif { font-family: 'Lora', serif; }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 28px 18px 90px; }
+  svg { display: block; }
+  button { font-family: 'Inter', sans-serif; cursor: pointer; }
 
-  header.hero { padding: 4px 0 26px; border-bottom: 1px solid var(--rule); margin-bottom: 22px; }
-  header.hero .kicker { color: var(--dusty-blue); font-size: 13px; margin: 0 0 6px; }
-  header.hero h1 { font-size: 32px; font-weight: 600; margin: 0 0 6px; font-style: italic; }
-  header.hero p { color: var(--parchment-dim); margin: 0; max-width: 60ch; font-size: 14.5px; }
+  .app { max-width: 720px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
 
-  /* Search block */
-  .search-block { position: relative; margin-bottom: 18px; }
-  .search-input-row { position: relative; }
-  .search-icon {
-    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-    color: var(--parchment-dim); pointer-events: none; font-size: 16px;
+  /* Sticky top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px; background: linear-gradient(180deg, var(--ink) 70%, transparent);
   }
+  .brand { font-family: 'Lora', serif; font-style: italic; font-weight: 600; font-size: 22px; }
+  .icon-btn {
+    background: var(--ink-2); border: 1px solid var(--rule); color: var(--parchment);
+    width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .icon-btn.active-dot::after {
+    content: ''; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px;
+    background: var(--brass); border-radius: 50%; border: 1.5px solid var(--ink-2);
+  }
+
+  /* Search bar */
+  .search-bar-wrap { padding: 2px 16px 10px; position: relative; }
+  .search-input-row { position: relative; }
+  .search-icon-svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--parchment-dim); }
   input[type="text"] {
     width: 100%;
     background: var(--ink-2);
     border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    padding: 15px 16px 15px 40px;
+    border-radius: 22px;
+    padding: 12px 14px 12px 40px;
     color: var(--parchment);
     font-family: 'Inter', sans-serif;
-    font-size: 16px;
+    font-size: 15.5px;
   }
   input[type="text"]::placeholder { color: var(--parchment-dim); }
-  input[type="text"]:focus, select:focus, button:focus-visible {
-    outline: 2px solid var(--brass); outline-offset: 1px;
-  }
+  input[type="text"]:focus, button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
 
   .autocomplete {
-    position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+    position: absolute; left: 16px; right: 16px; top: calc(100% + 2px);
     background: var(--ink-3); border: 1px solid var(--rule); border-radius: var(--radius);
     max-height: 340px; overflow-y: auto; z-index: 40;
-    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.4);
     display: none;
   }
   .autocomplete.open { display: block; }
-  .ac-item {
-    display: flex; gap: 10px; padding: 9px 12px; cursor: pointer;
-    border-bottom: 1px solid var(--rule); align-items: center;
-  }
+  .ac-item { display: flex; gap: 10px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--rule); align-items: center; }
   .ac-item:last-child { border-bottom: none; }
   .ac-item:hover, .ac-item.hl { background: var(--ink-4); }
   .ac-cover { width: 32px; height: 46px; object-fit: cover; border-radius: 2px; background: var(--ink); flex-shrink: 0; }
   .ac-cover.placeholder { display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--parchment-dim); text-align:center; }
-  .ac-text { min-width: 0; }
   .ac-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ac-meta { font-size: 12px; color: var(--parchment-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ac-empty { padding: 12px; font-size: 13px; color: var(--parchment-dim); }
 
-  button {
-    background: var(--brass); color: var(--ink); border: none; border-radius: var(--radius);
-    padding: 11px 18px; font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Inter', sans-serif;
-  }
-  button:hover { background: var(--brass-soft); }
-  button.ghost { background: transparent; border: 1px solid var(--rule); color: var(--parchment); }
-  button.ghost:hover { border-color: var(--brass); color: var(--brass); }
-  button.small { padding: 7px 13px; font-size: 12.5px; }
+  /* Content */
+  .content { flex: 1; padding: 4px 16px 30px; }
+  .view[hidden] { display: none; }
+  .section-title { font-size: 15px; font-weight: 600; margin: 18px 2px 10px; color: var(--parchment); display: flex; align-items: baseline; gap: 8px; }
+  .section-title .sub { font-size: 12px; font-weight: 400; color: var(--parchment-dim); }
+  .status { color: var(--parchment-dim); font-size: 14px; padding: 40px 4px; text-align: center; }
 
-  /* Filter pills */
-  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .pill-group { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-  .pill-group::-webkit-scrollbar { display: none; }
-  .pill {
-    flex-shrink: 0; background: var(--ink-2); border: 1px solid var(--rule); color: var(--parchment-dim);
-    border-radius: 20px; padding: 7px 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
-  }
-  .pill.active { background: var(--brass); color: var(--ink); border-color: var(--brass); font-weight: 600; }
-  select {
-    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 20px; color: var(--parchment);
-    padding: 7px 12px; font-family: 'Inter', sans-serif; font-size: 13px;
-  }
+  /* Carousel */
+  .carousel { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .carousel::-webkit-scrollbar { display: none; }
+  .carousel-card { flex: 0 0 108px; scroll-snap-align: start; cursor: pointer; }
+  .carousel-card .cover-wrap { width: 108px; aspect-ratio: 2/3; }
+  .carousel-card .card-title { font-size: 12.5px; margin-top: 7px; }
+  .carousel-card .card-author { font-size: 11px; }
 
-  nav.tabs { display: flex; gap: 4px; margin: 22px 0 18px; border-bottom: 1px solid var(--rule); }
-  nav.tabs button {
-    background: none; color: var(--parchment-dim); border: none; border-radius: 0;
-    padding: 10px 4px; margin-right: 22px; font-size: 14.5px; font-weight: 500; border-bottom: 2px solid transparent;
+  /* Grid */
+  .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 14px; }
+  .book-card { cursor: pointer; display: flex; flex-direction: column; }
+  .cover-wrap {
+    aspect-ratio: 2/3; background: var(--ink-3); border-radius: 7px; position: relative; overflow: hidden;
+    border: 1px solid var(--rule);
   }
-  nav.tabs button.active { color: var(--parchment); border-bottom-color: var(--brass); }
-
-  .status { color: var(--parchment-dim); font-size: 14px; padding: 30px 4px; text-align: center; }
-
-  /* Card grid */
-  .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
-  .book-card {
-    background: var(--ink-2); border: 1px solid var(--rule); border-radius: var(--radius);
-    overflow: hidden; cursor: pointer; display: flex; flex-direction: column; transition: border-color .15s;
-  }
-  .book-card:hover, .book-card:focus-visible { border-color: var(--brass); }
-  .cover-wrap { aspect-ratio: 2/3; background: var(--ink-3); position: relative; }
   .cover-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .cover-wrap .placeholder-cover {
+  .placeholder-cover {
     width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    font-family: 'Lora', serif; font-size: 12px; color: var(--parchment-dim); text-align: center; padding: 10px;
+    font-family: 'Lora', serif; font-size: 11px; color: var(--parchment-dim); text-align: center; padding: 8px;
   }
   .rating-badge {
-    position: absolute; top: 7px; right: 7px; background: rgba(16,35,28,0.88);
-    border: 1px solid var(--rule); border-radius: 20px; padding: 2px 8px 2px 6px;
-    font-size: 11.5px; font-weight: 600; color: var(--brass); display: flex; align-items: center; gap: 3px;
+    position: absolute; top: 6px; right: 6px; background: rgba(16,35,28,0.9);
+    border: 1px solid var(--rule); border-radius: 20px; padding: 2px 7px 2px 5px;
+    font-size: 11px; font-weight: 600; color: var(--brass); display: flex; align-items: center; gap: 3px;
   }
-  .card-body { padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
-  .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.3;
+  .match-badge {
+    position: absolute; top: 6px; left: 6px; background: var(--brass);
+    border-radius: 20px; padding: 2px 8px; font-size: 10.5px; font-weight: 700; color: var(--ink);
+  }
+  .card-title { font-size: 13px; font-weight: 600; line-height: 1.3; margin-top: 8px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .card-author { font-size: 12px; color: var(--dusty-blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .card-year { font-size: 11px; color: var(--parchment-dim); margin-top: auto; padding-top: 4px; }
+  .card-author { font-size: 11.5px; color: var(--dusty-blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 
-  /* Detail modal */
-  .modal-backdrop {
+  /* Similar view intro */
+  .similar-hint { font-size: 13px; color: var(--parchment-dim); margin: 4px 2px 12px; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: sticky; bottom: 0; z-index: 30;
+    display: flex; background: var(--ink-2); border-top: 1px solid var(--rule);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  }
+  .nav-btn {
+    flex: 1; background: none; border: none; color: var(--parchment-dim);
+    display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px; border-radius: 10px;
+    font-size: 11px; font-weight: 500;
+  }
+  .nav-btn.active { color: var(--brass); }
+  .nav-btn svg { width: 21px; height: 21px; }
+
+  /* Sheets (filter + detail) */
+  .sheet-backdrop {
     position: fixed; inset: 0; background: rgba(8,16,13,0.72); z-index: 100;
     display: none; align-items: flex-end; justify-content: center;
   }
-  .modal-backdrop.open { display: flex; }
-  .modal {
-    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 14px 14px 0 0;
-    max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 20px 20px 26px;
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 16px 16px 0 0;
+    max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
   }
   @media (min-width: 640px) {
-    .modal-backdrop { align-items: center; }
-    .modal { border-radius: 14px; margin: 20px; }
+    .sheet-backdrop { align-items: center; }
+    .sheet { border-radius: 16px; margin: 20px; }
   }
-  .modal-close {
-    float: right; background: var(--ink-3); border: 1px solid var(--rule); color: var(--parchment);
-    border-radius: 50%; width: 30px; height: 30px; padding: 0; font-size: 16px; line-height: 1;
+  .sheet-handle { width: 36px; height: 4px; background: var(--rule); border-radius: 4px; margin: 0 auto 14px; }
+  .sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .sheet-header h3 { font-size: 17px; margin: 0; }
+  .close-x {
+    background: var(--ink-3); border: 1px solid var(--rule); color: var(--parchment);
+    border-radius: 50%; width: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1;
   }
-  .modal-top { display: flex; gap: 16px; margin-bottom: 14px; }
-  .modal-cover { width: 92px; flex-shrink: 0; aspect-ratio: 2/3; border-radius: 4px; overflow: hidden; background: var(--ink-3); }
+
+  .field-label { font-size: 12px; color: var(--parchment-dim); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field-label:first-of-type { margin-top: 0; }
+  .pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    background: var(--ink-3); border: 1px solid var(--rule); color: var(--parchment-dim);
+    border-radius: 20px; padding: 8px 15px; font-size: 13.5px; cursor: pointer;
+  }
+  .pill.active { background: var(--brass); color: var(--ink); border-color: var(--brass); font-weight: 600; }
+  select {
+    width: 100%; background: var(--ink-3); border: 1px solid var(--rule); border-radius: var(--radius);
+    color: var(--parchment); padding: 11px 12px; font-family: 'Inter', sans-serif; font-size: 14.5px;
+  }
+  .apply-btn {
+    width: 100%; margin-top: 20px; background: var(--brass); color: var(--ink); border: none;
+    border-radius: var(--radius); padding: 13px; font-weight: 700; font-size: 15px;
+  }
+
+  /* Detail modal */
+  .modal-top { display: flex; gap: 16px; margin-bottom: 4px; }
+  .modal-cover { width: 92px; flex-shrink: 0; aspect-ratio: 2/3; border-radius: 6px; overflow: hidden; background: var(--ink-3); }
   .modal-cover img { width: 100%; height: 100%; object-fit: cover; }
-  .modal-title { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .modal-title { font-size: 19px; font-weight: 600; margin: 0 0 4px; font-family: 'Lora', serif; }
   .modal-author { color: var(--dusty-blue); font-size: 14px; margin: 0 0 8px; }
-  .modal-rating { color: var(--brass); font-weight: 600; font-size: 14px; }
-  .modal-desc { font-size: 13.5px; color: var(--parchment-dim); line-height: 1.6; margin: 14px 0; }
+  .modal-rating { color: var(--brass); font-weight: 600; font-size: 13.5px; }
+  .modal-desc { font-size: 13.5px; color: var(--parchment-dim); line-height: 1.65; margin: 16px 0; }
   .modal-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
   .tag { border: 1px solid var(--rule); border-radius: 20px; padding: 3px 10px; font-size: 11.5px; color: var(--parchment-dim); }
   .modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .modal-actions button {
+    background: var(--brass); color: var(--ink); border: none; border-radius: var(--radius);
+    padding: 11px 18px; font-weight: 600; font-size: 13.5px;
+  }
+  .modal-actions button.ghost { background: transparent; border: 1px solid var(--rule); color: var(--parchment); }
 
-  footer.note { margin-top: 44px; color: var(--parchment-dim); font-size: 12.5px; border-top: 1px solid var(--rule); padding-top: 16px; }
   a { color: var(--dusty-blue); }
-  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-  <header class="hero">
-    <p class="kicker">A companion catalog for readers</p>
-    <h1>Stacks</h1>
-    <p>Type a title and pick the exact book from the list, then filter, browse what's trending, or find its neighbors.</p>
-  </header>
+  <div class="topbar">
+    <span class="brand">Stacks</span>
+    <button class="icon-btn" id="filterToggle" aria-label="Filters">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2.3" fill="var(--ink-2)"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.3" fill="var(--ink-2)"/></svg>
+    </button>
+  </div>
 
-  <div class="search-block">
+  <div class="search-bar-wrap">
     <div class="search-input-row">
-      <span class="search-icon">⌕</span>
-      <input type="text" id="searchInput" placeholder="Search by title, author, or topic…" autocomplete="off">
+      <svg class="search-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      <input type="text" id="searchInput" placeholder="Search by title, author, or theme…" autocomplete="off">
     </div>
     <div class="autocomplete" id="searchAC"></div>
   </div>
 
-  <div class="filters">
+  <main class="content" id="content">
+
+    <div class="view" id="trendingView">
+      <div class="section-title">Trending today <span class="sub">· Open Library</span></div>
+      <div class="carousel" id="trendingCarousel"></div>
+      <div class="section-title">More to explore</div>
+      <div id="trendingGrid"><p class="status">Loading…</p></div>
+    </div>
+
+    <div class="view" id="searchView" hidden>
+      <div id="searchGrid"><p class="status">Search above to see results.</p></div>
+    </div>
+
+    <div class="view" id="similarView" hidden>
+      <p class="similar-hint">Type a book you've read and pick it from the list — matches use its actual themes and author, not just its genre.</p>
+      <div class="search-input-row">
+        <svg class="search-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <input type="text" id="similarInput" placeholder="e.g. Piranesi, The Song of Achilles…" autocomplete="off">
+      </div>
+      <div class="autocomplete" id="similarAC"></div>
+      <div id="similarGrid" style="margin-top:16px;"><p class="status">Pick a book above to find its neighbors.</p></div>
+    </div>
+
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="trending">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4-3 5-3 9a3 3 0 0 0 6 0c0-1-.5-2-.5-2 1.5.5 2.5 2.5 2.5 4.5A5 5 0 0 1 7 13.5C7 8 12 6 12 2z"/></svg>
+      Trending
+    </button>
+    <button class="nav-btn" data-tab="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      Search
+    </button>
+    <button class="nav-btn" data-tab="similar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+      Similar
+    </button>
+  </nav>
+</div>
+
+<!-- Filter sheet -->
+<div class="sheet-backdrop" id="filterSheetBackdrop">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Filters</h3><button class="close-x" id="filterCloseX">✕</button></div>
+    <div class="field-label">Genre</div>
     <div class="pill-group" id="genrePills">
-      <button class="pill active" data-genre="">Any genre</button>
+      <button class="pill active" data-genre="">Any</button>
       <button class="pill" data-genre="fiction">Fiction</button>
       <button class="pill" data-genre="fantasy">Fantasy</button>
       <button class="pill" data-genre="science fiction">Sci-fi</button>
@@ -200,8 +281,7 @@
       <button class="pill" data-genre="biography">Biography</button>
       <button class="pill" data-genre="poetry">Poetry</button>
     </div>
-  </div>
-  <div class="filters">
+    <div class="field-label">Minimum rating</div>
     <select id="ratingFilter">
       <option value="0">Any rating</option>
       <option value="3">3★ and up</option>
@@ -209,51 +289,27 @@
       <option value="4">4★ and up</option>
       <option value="4.5">4.5★ and up</option>
     </select>
+    <div class="field-label">Sort by</div>
     <select id="sortFilter">
-      <option value="relevance">Sort: relevance</option>
-      <option value="rating">Sort: highest rated</option>
-      <option value="newest">Sort: newest</option>
+      <option value="relevance">Relevance</option>
+      <option value="rating">Highest rated</option>
+      <option value="newest">Newest</option>
     </select>
+    <button class="apply-btn" id="applyFilters">Show results</button>
   </div>
-
-  <nav class="tabs">
-    <button class="active" data-tab="search">Search results</button>
-    <button data-tab="trending">Best right now</button>
-    <button data-tab="similar">Find similar</button>
-  </nav>
-
-  <div id="trendingIntro" style="display:none; margin-bottom: 14px;">
-    <p class="status" style="padding: 0; text-align:left;">Currently trending on Open Library — updated daily.</p>
-  </div>
-
-  <div id="similarIntro" style="display:none; margin-bottom: 16px;">
-    <p style="margin:0 0 10px; font-size:13.5px; color:var(--parchment-dim);">Type a book you've read and pick it from the list — we'll match on its actual themes, not just its genre.</p>
-    <div class="search-block">
-      <div class="search-input-row">
-        <span class="search-icon">⌕</span>
-        <input type="text" id="similarInput" placeholder="e.g. Piranesi, The Song of Achilles…" autocomplete="off">
-      </div>
-      <div class="autocomplete" id="similarAC"></div>
-    </div>
-  </div>
-
-  <div id="results"><p class="status">Search above to see results.</p></div>
-
-  <footer class="note">
-    Data from <a href="https://openlibrary.org/developers/api" target="_blank" rel="noopener">Open Library</a> — free, no account needed. Ratings are Open Library's community ratings; many titles simply don't have enough yet to show one.
-  </footer>
 </div>
 
-<div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal" id="modalBody"></div>
+<!-- Detail sheet -->
+<div class="sheet-backdrop" id="modalBackdrop">
+  <div class="sheet" id="modalBody"></div>
 </div>
 
 <script>
-const results = document.getElementById('results');
-const ratingFilter = document.getElementById('ratingFilter');
-const sortFilter = document.getElementById('sortFilter');
-let activeTab = 'search';
+const ratingFilter2Placeholder = null; // no-op
+
+let activeTab = 'trending';
 let activeGenre = '';
+window.rawByTab = { search: null, trending: null, similar: null };
 
 function escapeHtml(str) {
   return (str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -262,7 +318,7 @@ function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
-function starBadge(rating, count) {
+function starBadge(rating) {
   if (!rating) return '';
   return `<span class="rating-badge">★ ${rating.toFixed(1)}</span>`;
 }
@@ -279,7 +335,7 @@ async function olSearch(query, limit) {
     title: w.title || 'Untitled',
     authors: (w.author_name || []).join(', '),
     year: w.first_publish_year || null,
-    categories: (w.subject || []).slice(0, 6),
+    categories: (w.subject || []).slice(0, 40),
     cover: coverUrl(w.cover_i, 'M'),
     coverL: coverUrl(w.cover_i, 'L'),
     workKey: w.key || null,
@@ -289,7 +345,6 @@ async function olSearch(query, limit) {
     description: ''
   }));
 }
-
 async function olWorkDetail(workKey) {
   const res = await fetch(`https://openlibrary.org${workKey}.json`);
   const data = await res.json();
@@ -297,7 +352,6 @@ async function olWorkDetail(workKey) {
   if (desc && typeof desc === 'object') desc = desc.value || '';
   return { description: desc, subjects: data.subjects || [] };
 }
-
 async function olRatings(workKey) {
   try {
     const res = await fetch(`https://openlibrary.org${workKey}/ratings.json`);
@@ -310,28 +364,21 @@ async function olRatings(workKey) {
 function setupAutocomplete(inputEl, dropdownEl, onSelect) {
   let items = [];
   let highlighted = -1;
-
   const search = debounce(async () => {
     const q = inputEl.value.trim();
     if (q.length < 2) { dropdownEl.classList.remove('open'); return; }
     items = await olSearch(q, 6);
     highlighted = -1;
-    if (!items.length) {
-      dropdownEl.innerHTML = '<div class="ac-empty">No matches yet — keep typing.</div>';
-    } else {
-      dropdownEl.innerHTML = items.map((b, i) => `
-        <div class="ac-item" data-i="${i}">
-          ${b.cover ? `<img class="ac-cover" src="${b.cover}" alt="">` : `<div class="ac-cover placeholder">${escapeHtml(b.title.slice(0,10))}</div>`}
-          <div class="ac-text">
-            <div class="ac-title">${escapeHtml(b.title)}</div>
-            <div class="ac-meta">${escapeHtml(b.authors || 'Unknown')}${b.year ? ' · ' + b.year : ''}</div>
-          </div>
+    dropdownEl.innerHTML = items.length ? items.map((b, i) => `
+      <div class="ac-item" data-i="${i}">
+        ${b.cover ? `<img class="ac-cover" src="${b.cover}" alt="">` : `<div class="ac-cover placeholder">${escapeHtml(b.title.slice(0,10))}</div>`}
+        <div>
+          <div class="ac-title">${escapeHtml(b.title)}</div>
+          <div class="ac-meta">${escapeHtml(b.authors || 'Unknown')}${b.year ? ' · ' + b.year : ''}</div>
         </div>
-      `).join('');
-    }
+      </div>`).join('') : '<div class="ac-empty">No matches yet — keep typing.</div>';
     dropdownEl.classList.add('open');
   }, 300);
-
   inputEl.addEventListener('input', search);
   inputEl.addEventListener('focus', () => { if (items.length) dropdownEl.classList.add('open'); });
   inputEl.addEventListener('keydown', e => {
@@ -339,9 +386,9 @@ function setupAutocomplete(inputEl, dropdownEl, onSelect) {
     if (e.key === 'ArrowDown') { e.preventDefault(); highlighted = Math.min(highlighted + 1, rows.length - 1); updateHl(rows); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); highlighted = Math.max(highlighted - 1, 0); updateHl(rows); }
     else if (e.key === 'Enter') {
-      if (highlighted >= 0 && items[highlighted]) { pick(items[highlighted]); }
+      if (highlighted >= 0 && items[highlighted]) pick(items[highlighted]);
       else { dropdownEl.classList.remove('open'); onSelect(null, inputEl.value.trim()); }
-    } else if (e.key === 'Escape') { dropdownEl.classList.remove('open'); }
+    } else if (e.key === 'Escape') dropdownEl.classList.remove('open');
   });
   function updateHl(rows) {
     rows.forEach((r, i) => r.classList.toggle('hl', i === highlighted));
@@ -349,8 +396,7 @@ function setupAutocomplete(inputEl, dropdownEl, onSelect) {
   }
   dropdownEl.addEventListener('click', e => {
     const row = e.target.closest('.ac-item');
-    if (!row) return;
-    pick(items[parseInt(row.dataset.i, 10)]);
+    if (row) pick(items[parseInt(row.dataset.i, 10)]);
   });
   function pick(book) {
     inputEl.value = book.title;
@@ -363,25 +409,42 @@ function setupAutocomplete(inputEl, dropdownEl, onSelect) {
 }
 
 /* ---------- Rendering ---------- */
-function renderBooks(books) {
-  window.currentBooks = books;
-  if (!books.length) {
-    results.innerHTML = '<p class="status">No results. Try a shorter search or a different genre.</p>';
-    return;
-  }
-  results.innerHTML = `<div class="book-grid">${books.map((b, i) => `
-    <div class="book-card" tabindex="0" onclick="openDetail(${i})" onkeydown="if(event.key==='Enter')openDetail(${i})">
+function bookCardHtml(b, i, small) {
+  return `
+    <div class="book-card${small ? ' carousel-card' : ''}" tabindex="0" onclick="openDetail(${i})" onkeydown="if(event.key==='Enter')openDetail(${i})">
       <div class="cover-wrap">
         ${b.cover ? `<img src="${b.cover}" alt="Cover of ${escapeHtml(b.title)}" loading="lazy">` : `<div class="placeholder-cover">${escapeHtml(b.title.slice(0,40))}</div>`}
+        ${typeof b.matchPct === 'number' ? `<span class="match-badge">${b.matchPct}% match</span>` : ''}
         <span id="badge-${i}">${starBadge(b.rating)}</span>
       </div>
-      <div class="card-body">
-        <div class="card-title">${escapeHtml(b.title)}</div>
-        <div class="card-author">${escapeHtml(b.authors || 'Unknown author')}</div>
-        <div class="card-year">${b.year || ''}</div>
-      </div>
-    </div>
-  `).join('')}</div>`;
+      <div class="card-title">${escapeHtml(b.title)}</div>
+      <div class="card-author">${escapeHtml(b.authors || 'Unknown author')}</div>
+    </div>`;
+}
+
+function renderInto(el, books) {
+  window.currentBooks = books;
+  if (!books.length) {
+    el.innerHTML = '<p class="status">No results. Try a shorter search or a different filter.</p>';
+    return;
+  }
+  el.innerHTML = `<div class="book-grid">${books.map((b, i) => bookCardHtml(b, i, false)).join('')}</div>`;
+  fillRatingsProgressively(books);
+}
+
+function renderTrending(books) {
+  window.currentBooks = books;
+  const carouselEl = document.getElementById('trendingCarousel');
+  const gridEl = document.getElementById('trendingGrid');
+  if (!books.length) {
+    carouselEl.innerHTML = '';
+    gridEl.innerHTML = '<p class="status">Couldn\'t load trending right now.</p>';
+    return;
+  }
+  const top = books.slice(0, 8);
+  const rest = books.slice(8);
+  carouselEl.innerHTML = top.map((b, i) => bookCardHtml(b, i, true)).join('');
+  gridEl.innerHTML = rest.length ? `<div class="book-grid">${rest.map((b, i) => bookCardHtml(b, i + 8, false)).join('')}</div>` : '';
   fillRatingsProgressively(books);
 }
 
@@ -398,13 +461,14 @@ async function fillRatingsProgressively(books) {
   }));
 }
 
-/* ---------- Detail modal ---------- */
+/* ---------- Detail sheet ---------- */
 async function openDetail(i) {
   const b = window.currentBooks[i];
   const backdrop = document.getElementById('modalBackdrop');
   const body = document.getElementById('modalBody');
   body.innerHTML = `
-    <button class="modal-close" onclick="closeDetail()" aria-label="Close">✕</button>
+    <div class="sheet-handle"></div>
+    <button class="close-x" style="float:right;" onclick="closeDetail()" aria-label="Close">✕</button>
     <div class="modal-top">
       <div class="modal-cover">${(b.coverL || b.cover) ? `<img src="${b.coverL || b.cover}" alt="">` : ''}</div>
       <div>
@@ -414,14 +478,12 @@ async function openDetail(i) {
       </div>
     </div>
     <p class="modal-desc" id="modalDesc">Loading description…</p>
-    <div class="modal-tags" id="modalTags">${(b.categories||[]).map(c=>`<span class="tag">${escapeHtml(c)}</span>`).join('')}</div>
+    <div class="modal-tags" id="modalTags">${(b.categories||[]).slice(0,10).map(c=>`<span class="tag">${escapeHtml(c)}</span>`).join('')}</div>
     <div class="modal-actions">
       <button onclick="findSimilarTo(${i})">Find similar</button>
       ${b.previewLink ? `<button class="ghost" onclick="window.open('${b.previewLink}','_blank')">Open in Open Library</button>` : ''}
-    </div>
-  `;
+    </div>`;
   backdrop.classList.add('open');
-
   if (b.workKey) {
     try {
       const detail = await olWorkDetail(b.workKey);
@@ -429,9 +491,7 @@ async function openDetail(i) {
       if (detail.subjects && detail.subjects.length) {
         document.getElementById('modalTags').innerHTML = detail.subjects.slice(0, 10).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('');
       }
-    } catch {
-      document.getElementById('modalDesc').textContent = 'Description unavailable right now.';
-    }
+    } catch { document.getElementById('modalDesc').textContent = 'Description unavailable right now.'; }
   } else {
     document.getElementById('modalDesc').textContent = 'No description available for this title.';
   }
@@ -440,107 +500,131 @@ function closeDetail() { document.getElementById('modalBackdrop').classList.remo
 document.getElementById('modalBackdrop').addEventListener('click', e => { if (e.target.id === 'modalBackdrop') closeDetail(); });
 
 /* ---------- Filters / sort ---------- */
+function matchesGenre(b, genre) {
+  if (!genre) return true;
+  const g = genre.toLowerCase();
+  return (b.categories || []).some(c => c.toLowerCase().includes(g));
+}
 function applyFiltersAndSort(books) {
-  const minRating = parseFloat(ratingFilter.value);
-  let filtered = books.filter(b => !minRating || (b.rating && b.rating >= minRating));
-  const sort = sortFilter.value;
+  const minRating = parseFloat(document.getElementById('ratingFilter').value);
+  let filtered = books.filter(b => matchesGenre(b, activeGenre) && (!minRating || (b.rating && b.rating >= minRating)));
+  const sort = document.getElementById('sortFilter').value;
   if (sort === 'rating') filtered.sort((a,b) => (b.rating||0) - (a.rating||0));
   else if (sort === 'newest') filtered.sort((a,b) => (b.year||0) - (a.year||0));
+  else if (typeof filtered[0]?.matchPct === 'number') filtered.sort((a,b) => (b.matchPct||0) - (a.matchPct||0));
   return filtered;
 }
+function refreshView() {
+  const raw = window.rawByTab[activeTab];
+  if (!raw) return;
+  const filtered = applyFiltersAndSort(raw);
+  if (activeTab === 'trending') renderTrending(filtered);
+  else if (activeTab === 'search') renderInto(document.getElementById('searchGrid'), filtered);
+  else renderInto(document.getElementById('similarGrid'), filtered);
+}
 
-/* ---------- Search tab ---------- */
+/* ---------- Search ---------- */
 async function doSearch(q) {
   q = (q || document.getElementById('searchInput').value.trim());
   if (!q) return;
   switchTab('search');
-  results.innerHTML = '<p class="status">Searching the shelves…</p>';
-  const genreQuery = activeGenre ? ` subject:"${activeGenre}"` : '';
+  document.getElementById('searchGrid').innerHTML = '<p class="status">Searching the shelves…</p>';
   try {
-    let books = await olSearch(q + genreQuery, 24);
-    if (!books.length && genreQuery) books = await olSearch(q, 24);
-    renderBooks(applyFiltersAndSort(books));
+    const books = await olSearch(q, 40);
+    window.rawByTab.search = books;
+    refreshView();
   } catch (e) {
-    results.innerHTML = '<p class="status">Network error reaching Open Library: ' + escapeHtml(e.message) + '</p>';
+    document.getElementById('searchGrid').innerHTML = '<p class="status">Network error reaching Open Library: ' + escapeHtml(e.message) + '</p>';
   }
 }
 
-/* ---------- Trending tab ---------- */
+/* ---------- Trending ---------- */
 async function loadTrending() {
-  results.innerHTML = '<p class="status">Pulling today\'s trending list…</p>';
+  document.getElementById('trendingGrid').innerHTML = '<p class="status">Loading…</p>';
   try {
     const res = await fetch('https://openlibrary.org/trending/daily.json');
     const data = await res.json();
-    const works = (data.works || []).slice(0, 24);
+    const works = (data.works || []).slice(0, 30);
     const books = works.map(w => ({
       title: w.title || 'Untitled',
       authors: (w.author_name || []).join(', '),
       year: w.first_publish_year || null,
-      categories: (w.subject || []).slice(0, 6),
+      categories: (w.subject || []).slice(0, 40),
       cover: coverUrl(w.cover_i, 'M'),
       coverL: coverUrl(w.cover_i, 'L'),
       workKey: w.key || null,
       previewLink: w.key ? `https://openlibrary.org${w.key}` : null,
       rating: null, ratingsCount: 0, description: ''
     }));
-    renderBooks(books);
+    window.rawByTab.trending = books;
+    refreshView();
   } catch (e) {
-    results.innerHTML = '<p class="status">Couldn\'t reach the trending list right now. Try again shortly.</p>';
+    document.getElementById('trendingGrid').innerHTML = '<p class="status">Couldn\'t reach the trending list right now.</p>';
   }
 }
 
-/* ---------- Similar tab ---------- */
+/* ---------- Similar: multi-factor match scoring ---------- */
 const GENERIC_SUBJECTS = new Set(['fiction','nonfiction','general','literature','juvenile fiction',
-  'large type books','protected daisy','accessible book','overdrive','reading level-grade']);
+  'large type books','protected daisy','accessible book','overdrive','reading level-grade',
+  'in library','new york times bestseller','fiction, general','american fiction','english fiction',
+  'open library staff picks','popular print disabled books','internet archive wishlist']);
+function normSubjects(list) {
+  return new Set((list || []).map(s => s.toLowerCase().trim()).filter(s => s && !GENERIC_SUBJECTS.has(s)));
+}
+function firstAuthor(authors) { return (authors || '').split(',')[0].trim().toLowerCase(); }
 
 async function runSimilarForWork(book) {
-  results.innerHTML = '<p class="status">Finding books near "' + escapeHtml(book.title) + '"…</p>';
+  const grid = document.getElementById('similarGrid');
+  grid.innerHTML = '<p class="status">Finding books near "' + escapeHtml(book.title) + '"…</p>';
   try {
-    let subjects = book.categories || [];
-    if (book.workKey) {
-      try { subjects = (await olWorkDetail(book.workKey)).subjects || subjects; } catch {}
-    }
-    const specific = subjects.filter(s => !GENERIC_SUBJECTS.has(s.toLowerCase()) && s.length < 40).slice(0, 3);
+    let seedSubjectsRaw = book.categories || [];
+    if (book.workKey) { try { seedSubjectsRaw = (await olWorkDetail(book.workKey)).subjects || seedSubjectsRaw; } catch {} }
+    const seedSubjects = normSubjects(seedSubjectsRaw);
+    const seedAuthor = firstAuthor(book.authors);
+    const seedYear = book.year;
 
-    let candidates = [];
-    if (specific.length) {
-      const grouped = await Promise.all(specific.map(async s => {
-        const slug = s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-        try {
-          const r = await fetch(`https://openlibrary.org/subjects/${slug}.json?limit=10`);
-          const d = await r.json();
-          return (d.works || []).map(w => ({
-            title: w.title,
-            authors: (w.authors || []).map(a => a.name).join(', '),
-            year: w.first_publish_year || null,
-            categories: [s],
-            cover: coverUrl(w.cover_id, 'M'),
-            coverL: coverUrl(w.cover_id, 'L'),
-            workKey: w.key || null,
-            previewLink: w.key ? `https://openlibrary.org${w.key}` : null,
-            rating: null, ratingsCount: 0, description: ''
-          }));
-        } catch { return []; }
-      }));
-      candidates = grouped.flat();
-    }
+    const specificSeeds = [...seedSubjects].filter(s => s.length < 45).slice(0, 6);
+    const pools = [];
+    if (specificSeeds.length) pools.push(olSearch(specificSeeds.map(s => `subject:"${s}"`).join(' OR '), 40));
+    if (seedAuthor) pools.push(olSearch(`author:"${book.authors.split(',')[0]}"`, 20));
+    const settled = await Promise.all(pools);
+    let candidates = settled.flat();
 
     const seen = new Set();
     candidates = candidates.filter(b => {
-      const key = b.title.toLowerCase();
-      if (key === book.title.toLowerCase() || seen.has(key)) return false;
-      seen.add(key);
-      return true;
+      const key = b.title.toLowerCase().trim();
+      if (key === book.title.toLowerCase().trim() || seen.has(key)) return false;
+      seen.add(key); return true;
     });
 
-    if (!candidates.length && book.authors) {
-      candidates = await olSearch(`author:"${book.authors.split(',')[0]}"`, 20);
-      candidates = candidates.filter(b => b.title.toLowerCase() !== book.title.toLowerCase());
-    }
+    const scored = candidates.map(c => {
+      const cSubjects = normSubjects(c.categories);
+      let overlap = 0;
+      cSubjects.forEach(s => { if (seedSubjects.has(s)) overlap++; });
+      const unionSize = new Set([...seedSubjects, ...cSubjects]).size || 1;
+      const jaccard = overlap / unionSize;
+      const authorMatch = seedAuthor && firstAuthor(c.authors) === seedAuthor;
+      const yearGap = (seedYear && c.year) ? Math.abs(c.year - seedYear) : null;
+      const yearScore = yearGap === null ? 0 : Math.max(0, 12 - yearGap / 6);
+      const ratingScore = c.rating ? Math.min(8, c.rating * 1.6) : 0;
+      let raw = jaccard * 70 + yearScore + ratingScore;
+      if (authorMatch) raw += 35;
+      return { ...c, matchPct: Math.max(1, Math.min(98, Math.round(raw))), _overlap: overlap, _authorMatch: authorMatch };
+    });
 
-    renderBooks(applyFiltersAndSort(candidates));
+    let books = scored.filter(b => b._authorMatch || b._overlap >= 2);
+    books.sort((a, b) => b.matchPct - a.matchPct);
+    books = books.slice(0, 24);
+
+    if (!books.length) {
+      grid.innerHTML = '<p class="status">Couldn\'t find close matches for this one — it may be too niche for Open Library\'s subject data. Try a more well-known title.</p>';
+      window.rawByTab.similar = [];
+      return;
+    }
+    window.rawByTab.similar = books;
+    refreshView();
   } catch (e) {
-    results.innerHTML = '<p class="status">' + escapeHtml(e.message) + '</p>';
+    grid.innerHTML = '<p class="status">' + escapeHtml(e.message) + '</p>';
   }
 }
 function findSimilarTo(i) {
@@ -550,49 +634,56 @@ function findSimilarTo(i) {
   document.getElementById('similarInput').value = b.title;
   runSimilarForWork(b);
 }
+async function doSearchAsSimilarSeed(text) {
+  const found = await olSearch(text, 1);
+  if (found.length) runSimilarForWork(found[0]);
+  else document.getElementById('similarGrid').innerHTML = '<p class="status">Couldn\'t find that title — try picking a suggestion from the list.</p>';
+}
 
 /* ---------- Tabs ---------- */
 function switchTab(tab) {
   activeTab = tab;
-  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  document.getElementById('trendingIntro').style.display = tab === 'trending' ? 'block' : 'none';
-  document.getElementById('similarIntro').style.display = tab === 'similar' ? 'block' : 'none';
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('trendingView').hidden = tab !== 'trending';
+  document.getElementById('searchView').hidden = tab !== 'search';
+  document.getElementById('similarView').hidden = tab !== 'similar';
+  if (window.rawByTab[tab]) refreshView();
+  else if (tab === 'trending') loadTrending();
 }
-document.querySelectorAll('nav.tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    switchTab(btn.dataset.tab);
-    if (btn.dataset.tab === 'trending') loadTrending();
-    else if (btn.dataset.tab === 'search') results.innerHTML = document.getElementById('searchInput').value.trim() ? results.innerHTML : '<p class="status">Search above to see results.</p>';
-    else results.innerHTML = '<p class="status">Pick a book above to find its neighbors.</p>';
-  });
-});
+document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
 
-/* ---------- Genre pills ---------- */
+/* ---------- Filter sheet ---------- */
+const filterSheetBackdrop = document.getElementById('filterSheetBackdrop');
+document.getElementById('filterToggle').addEventListener('click', () => filterSheetBackdrop.classList.add('open'));
+document.getElementById('filterCloseX').addEventListener('click', () => filterSheetBackdrop.classList.remove('open'));
+filterSheetBackdrop.addEventListener('click', e => { if (e.target.id === 'filterSheetBackdrop') filterSheetBackdrop.classList.remove('open'); });
 document.getElementById('genrePills').addEventListener('click', e => {
   const pill = e.target.closest('.pill');
   if (!pill) return;
   document.querySelectorAll('#genrePills .pill').forEach(p => p.classList.remove('active'));
   pill.classList.add('active');
   activeGenre = pill.dataset.genre;
-  if (document.getElementById('searchInput').value.trim()) doSearch();
 });
-ratingFilter.addEventListener('change', () => { if (activeTab === 'search' && document.getElementById('searchInput').value.trim()) doSearch(); });
-sortFilter.addEventListener('change', () => { if (activeTab === 'search' && document.getElementById('searchInput').value.trim()) doSearch(); });
+document.getElementById('applyFilters').addEventListener('click', () => {
+  filterSheetBackdrop.classList.remove('open');
+  refreshView();
+  document.getElementById('filterToggle').classList.toggle('active-dot', !!activeGenre || document.getElementById('ratingFilter').value !== '0');
+});
 
 /* ---------- Wire up search inputs + autocomplete ---------- */
-setupAutocomplete(document.getElementById('searchInput'), document.getElementById('searchAC'), (book, text) => {
-  if (book) { window.currentBooks = [book]; renderBooks([book]); openDetail(0); }
+const searchInputEl = document.getElementById('searchInput');
+searchInputEl.addEventListener('focus', () => { if (activeTab !== 'search') switchTab('search'); });
+setupAutocomplete(searchInputEl, document.getElementById('searchAC'), (book, text) => {
+  if (book) { switchTab('search'); window.currentBooks = [book]; renderInto(document.getElementById('searchGrid'), [book]); openDetail(0); }
   else doSearch(text);
 });
 setupAutocomplete(document.getElementById('similarInput'), document.getElementById('similarAC'), (book, text) => {
   if (book) runSimilarForWork(book);
   else doSearchAsSimilarSeed(text);
 });
-async function doSearchAsSimilarSeed(text) {
-  const found = await olSearch(text, 1);
-  if (found.length) runSimilarForWork(found[0]);
-  else results.innerHTML = '<p class="status">Couldn\'t find that title — try picking a suggestion from the list.</p>';
-}
+
+/* ---------- Init ---------- */
+loadTrending();
 </script>
 </body>
 </html>
