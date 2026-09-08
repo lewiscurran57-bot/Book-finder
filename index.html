@@ -202,6 +202,30 @@
   .modal-actions button.ghost { background: transparent; border: 1px solid var(--rule); color: var(--parchment); }
 
   a { color: var(--dusty-blue); }
+
+  /* Responsive: tablet and up */
+  @media (min-width: 640px) {
+    .app { max-width: 880px; }
+    .book-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px; }
+    .carousel-card { flex: 0 0 130px; }
+    .carousel-card .cover-wrap { width: 130px; }
+    .content { padding: 4px 24px 30px; }
+    .topbar, .search-bar-wrap { padding-left: 24px; padding-right: 24px; }
+  }
+  /* Desktop */
+  @media (min-width: 1000px) {
+    .app { max-width: 1080px; }
+    .book-grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 20px; }
+    .bottom-nav { max-width: 1080px; margin: 0 auto; border-radius: 14px 14px 0 0; }
+    .brand { font-size: 25px; }
+  }
+  /* Small phones */
+  @media (max-width: 360px) {
+    .book-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+    .carousel-card { flex: 0 0 92px; }
+    .carousel-card .cover-wrap { width: 92px; }
+    .content, .topbar, .search-bar-wrap { padding-left: 12px; padding-right: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -214,7 +238,7 @@
     </button>
   </div>
 
-  <div class="search-bar-wrap">
+  <div class="search-bar-wrap" id="topSearchBarWrap">
     <div class="search-input-row">
       <svg class="search-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
       <input type="text" id="searchInput" placeholder="Search by title, author, or theme…" autocomplete="off">
@@ -225,7 +249,7 @@
   <main class="content" id="content">
 
     <div class="view" id="trendingView">
-      <div class="section-title">Trending today <span class="sub">· Open Library</span></div>
+      <div class="section-title">Trending today <span class="sub">· spikes in views &amp; reader activity vs. the last week</span></div>
       <div class="carousel" id="trendingCarousel"></div>
       <div class="section-title">More to explore</div>
       <div id="trendingGrid"><p class="status">Loading…</p></div>
@@ -326,11 +350,55 @@ function coverUrl(coverId, size) {
   return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size || 'M'}.jpg` : null;
 }
 
+/* ---------- Google Books: fallback only, tightly capped ----------
+   Open Library is the primary source everywhere. Google Books is only ever
+   called (a) once, on demand, when someone opens a book's detail sheet and
+   Open Library came up short, or (b) for a small capped top-up (max 4 books)
+   on the trending carousel. Never in a loop over a full result list — that's
+   exactly what burned the daily quota before. */
+const GOOGLE_BOOKS_KEY = 'AIzaSyAsgSZq7Hi_LF-QHyyXAzUXsja8YCHCZcM';
+function gbKeyParam() { return GOOGLE_BOOKS_KEY ? '&key=' + GOOGLE_BOOKS_KEY : ''; }
+async function googleEnrich(book) {
+  if (!GOOGLE_BOOKS_KEY) return null;
+  try {
+    const author0 = book.authors ? book.authors.split(',')[0] : '';
+    const q = 'intitle:"' + book.title + '"' + (author0 ? ' inauthor:"' + author0 + '"' : '');
+    const data = await fetchJson(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}${gbKeyParam()}&maxResults=1`, 6000);
+    if (data.error) return null;
+    return (data.items && data.items[0] && data.items[0].volumeInfo) || null;
+  } catch { return null; }
+}
+
 /* ---------- Open Library calls ---------- */
+async function fetchJson(url, timeoutMs) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs || 9000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return await res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+// Run async tasks with a max concurrency, instead of firing them all at once —
+// Safari caps ~6 connections per host, so blasting 20-30 requests at openlibrary.org
+// simultaneously was causing later ones to stall or fail outright.
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      try { results[i] = await fn(items[i], i); } catch { results[i] = null; }
+    }
+  }
+  await Promise.all(new Array(Math.min(limit, items.length)).fill(0).map(worker));
+  return results;
+}
+
 async function olSearch(query, limit) {
   const fields = 'title,author_name,first_publish_year,subject,cover_i,key,ratings_average,ratings_count';
-  const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&fields=${fields}&limit=${limit}`);
-  const data = await res.json();
+  const data = await fetchJson(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&fields=${fields}&limit=${limit}`);
   return (data.docs || []).map(w => ({
     title: w.title || 'Untitled',
     authors: (w.author_name || []).join(', '),
@@ -346,16 +414,14 @@ async function olSearch(query, limit) {
   }));
 }
 async function olWorkDetail(workKey) {
-  const res = await fetch(`https://openlibrary.org${workKey}.json`);
-  const data = await res.json();
+  const data = await fetchJson(`https://openlibrary.org${workKey}.json`);
   let desc = data.description || '';
   if (desc && typeof desc === 'object') desc = desc.value || '';
   return { description: desc, subjects: data.subjects || [] };
 }
 async function olRatings(workKey) {
   try {
-    const res = await fetch(`https://openlibrary.org${workKey}/ratings.json`);
-    const data = await res.json();
+    const data = await fetchJson(`https://openlibrary.org${workKey}/ratings.json`, 6000);
     return { rating: (data.summary && data.summary.average) || null, count: (data.summary && data.summary.count) || 0 };
   } catch { return { rating: null, count: 0 }; }
 }
@@ -429,7 +495,8 @@ function renderInto(el, books) {
     return;
   }
   el.innerHTML = `<div class="book-grid">${books.map((b, i) => bookCardHtml(b, i, false)).join('')}</div>`;
-  fillRatingsProgressively(books);
+  // No extra rating calls here — search/similar results already carry ratings_average
+  // straight from the search response, so there's nothing to fill in.
 }
 
 function renderTrending(books) {
@@ -445,20 +512,39 @@ function renderTrending(books) {
   const rest = books.slice(8);
   carouselEl.innerHTML = top.map((b, i) => bookCardHtml(b, i, true)).join('');
   gridEl.innerHTML = rest.length ? `<div class="book-grid">${rest.map((b, i) => bookCardHtml(b, i + 8, false)).join('')}</div>` : '';
-  fillRatingsProgressively(books);
+  // Trending data has no ratings baked in — fetch them, but only for the visible
+  // carousel (8 books) and only 3 at a time, so it doesn't compete with everything else.
+  fillRatingsProgressively(top);
 }
 
 async function fillRatingsProgressively(books) {
-  await Promise.all(books.map(async (b, i) => {
-    if (b.rating || !b.workKey) return;
+  await mapLimit(books, 3, async (b) => {
+    const i = window.currentBooks.indexOf(b);
+    if (b.rating || !b.workKey || i === -1) return;
     const r = await olRatings(b.workKey);
     if (r.rating) {
-      books[i].rating = r.rating;
-      books[i].ratingsCount = r.count;
+      window.currentBooks[i].rating = r.rating;
+      window.currentBooks[i].ratingsCount = r.count;
       const badge = document.getElementById('badge-' + i);
       if (badge) badge.innerHTML = starBadge(r.rating);
     }
-  }));
+  });
+  // Open Library's own ratings are sparse — top up just the first few still-missing
+  // ones from Google Books, capped hard at 4 so this can never turn into a bulk call.
+  const stillMissing = books.filter(b => !b.rating).slice(0, 4);
+  if (stillMissing.length) {
+    await mapLimit(stillMissing, 2, async (b) => {
+      const i = window.currentBooks.indexOf(b);
+      if (i === -1) return;
+      const v = await googleEnrich(b);
+      if (v && v.averageRating) {
+        window.currentBooks[i].rating = v.averageRating;
+        window.currentBooks[i].ratingsCount = v.ratingsCount || 0;
+        const badge = document.getElementById('badge-' + i);
+        if (badge) badge.innerHTML = starBadge(v.averageRating);
+      }
+    });
+  }
 }
 
 /* ---------- Detail sheet ---------- */
@@ -474,7 +560,7 @@ async function openDetail(i) {
       <div>
         <p class="modal-title">${escapeHtml(b.title)}</p>
         <p class="modal-author">${escapeHtml(b.authors || 'Unknown author')}</p>
-        <p class="modal-rating">${b.rating ? '★ ' + b.rating.toFixed(1) + ' (' + b.ratingsCount + ' ratings)' : 'No community rating yet'}</p>
+        <p class="modal-rating" id="modalRating">${b.rating ? '★ ' + b.rating.toFixed(1) + ' (' + b.ratingsCount + ' ratings)' : 'No community rating yet'}</p>
       </div>
     </div>
     <p class="modal-desc" id="modalDesc">Loading description…</p>
@@ -484,16 +570,48 @@ async function openDetail(i) {
       ${b.previewLink ? `<button class="ghost" onclick="window.open('${b.previewLink}','_blank')">Open in Open Library</button>` : ''}
     </div>`;
   backdrop.classList.add('open');
+
+  // 1. Open Library description + subjects
+  let haveDesc = false;
   if (b.workKey) {
     try {
       const detail = await olWorkDetail(b.workKey);
-      document.getElementById('modalDesc').textContent = detail.description || 'No description available for this title.';
+      const descEl = document.getElementById('modalDesc');
+      if (detail.description) { descEl.textContent = detail.description; haveDesc = true; }
+      else descEl.textContent = 'No description available for this title.';
       if (detail.subjects && detail.subjects.length) {
         document.getElementById('modalTags').innerHTML = detail.subjects.slice(0, 10).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('');
       }
     } catch { document.getElementById('modalDesc').textContent = 'Description unavailable right now.'; }
   } else {
     document.getElementById('modalDesc').textContent = 'No description available for this title.';
+  }
+
+  // 2. Open Library rating, if we don't already have one
+  if (!b.rating && b.workKey) {
+    const r = await olRatings(b.workKey);
+    if (r.rating) {
+      b.rating = r.rating; b.ratingsCount = r.count;
+      const el = document.getElementById('modalRating');
+      if (el) el.textContent = '★ ' + r.rating.toFixed(1) + ' (' + r.count + ' ratings)';
+    }
+  }
+
+  // 3. Exactly one Google Books call, only if Open Library still came up short —
+  // runs after both OL attempts finish, never in parallel with them.
+  if (!b.rating || !haveDesc) {
+    const v = await googleEnrich(b);
+    if (v) {
+      if (!b.rating && v.averageRating) {
+        b.rating = v.averageRating; b.ratingsCount = v.ratingsCount || 0;
+        const el = document.getElementById('modalRating');
+        if (el) el.textContent = '★ ' + v.averageRating.toFixed(1) + ' (' + (v.ratingsCount || 0) + ' ratings)';
+      }
+      if (!haveDesc && v.description) {
+        const descEl = document.getElementById('modalDesc');
+        if (descEl) descEl.textContent = v.description;
+      }
+    }
   }
 }
 function closeDetail() { document.getElementById('modalBackdrop').classList.remove('open'); }
@@ -542,10 +660,7 @@ async function doSearch(q) {
 async function loadTrending() {
   document.getElementById('trendingGrid').innerHTML = '<p class="status">Loading…</p>';
   try {
-    const res = await fetch('https://openlibrary.org/trending/daily.json');
-    const data = await res.json();
-    const works = (data.works || []).slice(0, 30);
-    const books = works.map(w => ({
+    const parse = data => (data.works || []).map(w => ({
       title: w.title || 'Untitled',
       authors: (w.author_name || []).join(', '),
       year: w.first_publish_year || null,
@@ -556,10 +671,26 @@ async function loadTrending() {
       previewLink: w.key ? `https://openlibrary.org${w.key}` : null,
       rating: null, ratingsCount: 0, description: ''
     }));
+    // Daily alone was too small a pool for filters/sort to do anything meaningful with —
+    // merge in weekly too and dedupe, so there's actually enough to work with.
+    const [dailyRes, weeklyRes] = await Promise.allSettled([
+      fetchJson('https://openlibrary.org/trending/daily.json'),
+      fetchJson('https://openlibrary.org/trending/weekly.json')
+    ]);
+    let books = [];
+    if (dailyRes.status === 'fulfilled') books = books.concat(parse(dailyRes.value));
+    if (weeklyRes.status === 'fulfilled') books = books.concat(parse(weeklyRes.value));
+    const seen = new Set();
+    books = books.filter(b => {
+      const k = b.title.toLowerCase().trim();
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    if (!books.length) throw new Error('no data');
     window.rawByTab.trending = books;
     refreshView();
   } catch (e) {
-    document.getElementById('trendingGrid').innerHTML = '<p class="status">Couldn\'t reach the trending list right now.</p>';
+    document.getElementById('trendingGrid').innerHTML = '<p class="status">Couldn\'t reach the trending list right now. <button class="ghost" style="padding:6px 12px;font-size:12.5px;" onclick="loadTrending()">Try again</button></p>';
   }
 }
 
@@ -587,8 +718,16 @@ async function runSimilarForWork(book) {
     const pools = [];
     if (specificSeeds.length) pools.push(olSearch(specificSeeds.map(s => `subject:"${s}"`).join(' OR '), 40));
     if (seedAuthor) pools.push(olSearch(`author:"${book.authors.split(',')[0]}"`, 20));
-    const settled = await Promise.all(pools);
-    let candidates = settled.flat();
+    // allSettled, not all — if the subject query times out, we still want the author
+    // results (or vice versa) instead of the whole match failing on one flaky request.
+    const settled = await Promise.allSettled(pools);
+    let candidates = settled.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+
+    if (!candidates.length) {
+      window._lastSimilarSeed = book;
+      grid.innerHTML = '<p class="status">Open Library didn\'t respond in time. <button class="ghost" style="padding:6px 12px;font-size:12.5px;" onclick="retrySimilar()">Try again</button></p>';
+      return;
+    }
 
     const seen = new Set();
     candidates = candidates.filter(b => {
@@ -635,10 +774,17 @@ function findSimilarTo(i) {
   runSimilarForWork(b);
 }
 async function doSearchAsSimilarSeed(text) {
-  const found = await olSearch(text, 1);
-  if (found.length) runSimilarForWork(found[0]);
-  else document.getElementById('similarGrid').innerHTML = '<p class="status">Couldn\'t find that title — try picking a suggestion from the list.</p>';
+  try {
+    const found = await olSearch(text, 1);
+    if (found.length) runSimilarForWork(found[0]);
+    else document.getElementById('similarGrid').innerHTML = '<p class="status">Couldn\'t find that title — try picking a suggestion from the list.</p>';
+  } catch (e) {
+    window._lastSimilarSeedText = text;
+    document.getElementById('similarGrid').innerHTML = '<p class="status">Network error: ' + escapeHtml(e.message) + '. <button class="ghost" style="padding:6px 12px;font-size:12.5px;" onclick="retrySimilarSeedText()">Try again</button></p>';
+  }
 }
+function retrySimilarSeedText() { if (window._lastSimilarSeedText) doSearchAsSimilarSeed(window._lastSimilarSeedText); }
+function retrySimilar() { if (window._lastSimilarSeed) runSimilarForWork(window._lastSimilarSeed); }
 
 /* ---------- Tabs ---------- */
 function switchTab(tab) {
@@ -647,6 +793,7 @@ function switchTab(tab) {
   document.getElementById('trendingView').hidden = tab !== 'trending';
   document.getElementById('searchView').hidden = tab !== 'search';
   document.getElementById('similarView').hidden = tab !== 'similar';
+  document.getElementById('topSearchBarWrap').style.display = tab === 'similar' ? 'none' : 'block';
   if (window.rawByTab[tab]) refreshView();
   else if (tab === 'trending') loadTrending();
 }
